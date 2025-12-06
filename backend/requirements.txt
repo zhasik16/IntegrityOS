@@ -1,0 +1,32 @@
+# FastAPI и сервер
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# База данных
+sqlalchemy==2.0.23
+alembic==1.12.1
+sqlite3
+
+# Работа с данными
+pandas==2.1.4
+numpy==1.24.3
+openpyxl==3.1.2
+python-multipart==0.0.6
+
+# Валидация данных
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# ML и анализ
+scikit-learn==1.3.2
+joblib==1.3.2
+
+# Отчеты
+jinja2==3.1.2
+reportlab==4.0.4
+weasyprint==61.0
+
+# Утилиты
+python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
