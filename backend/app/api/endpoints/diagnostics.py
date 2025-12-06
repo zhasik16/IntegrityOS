@@ -1,45 +1,70 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import List, Optional
+from fastapi import APIRouter, Query, HTTPException
+from app.db.database import SessionLocal
+from app.db import crud
+from typing import Optional
 from datetime import date
-from app.db import crud, session
-from app import schemas
 
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.Diagnostic])
+@router.get("/")
 def get_diagnostics(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
     object_id: Optional[int] = None,
     method: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     defect_found: Optional[bool] = None,
-    db: Session = Depends(session.get_db)
+    skip: int = 0,
+    limit: int = 100
 ):
-    """Получить список диагностик с фильтрацией"""
-    diagnostics = crud.DiagnosticCRUD.get_diagnostics(
-        db=db,
-        skip=skip,
-        limit=limit,
-        object_id=object_id,
-        method=method,
-        start_date=start_date,
-        end_date=end_date,
-        defect_found=defect_found
-    )
-    return diagnostics
+    db = SessionLocal()
+    try:
+        diagnostics = crud.DiagnosticCRUD.get_diagnostics(
+            db,
+            skip=skip,
+            limit=limit,
+            object_id=object_id,
+            method=method,
+            start_date=start_date,
+            end_date=end_date,
+            defect_found=defect_found
+        )
+        
+        return [
+            {
+                "diag_id": diag.diag_id,
+                "object_id": diag.object_id,
+                "method": diag.method.value,
+                "date": diag.date.isoformat(),
+                "temperature": diag.temperature,
+                "humidity": diag.humidity,
+                "illumination": diag.illumination,
+                "defect_found": diag.defect_found,
+                "defect_description": diag.defect_description,
+                "quality_grade": diag.quality_grade.value,
+                "param1": diag.param1,
+                "param2": diag.param2,
+                "param3": diag.param3,
+                "ml_label": diag.ml_label.value if diag.ml_label else None
+            }
+            for diag in diagnostics
+        ]
+    finally:
+        db.close()
 
-@router.get("/{diag_id}", response_model=schemas.Diagnostic)
-def get_diagnostic(diag_id: int, db: Session = Depends(session.get_db)):
-    """Получить диагностику по ID"""
-    db_diagnostic = crud.DiagnosticCRUD.get_diagnostic(db, diag_id)
-    if db_diagnostic is None:
-        raise HTTPException(status_code=404, detail="Diagnostic not found")
-    return db_diagnostic
+@router.get("/stats")
+def get_diagnostics_stats():
+    db = SessionLocal()
+    try:
+        stats = crud.DiagnosticCRUD.get_diagnostics_stats(db)
+        return stats
+    finally:
+        db.close()
 
-@router.post("/", response_model=schemas.Diagnostic)
-def create_diagnostic(diag: schemas.DiagnosticCreate, db: Session = Depends(session.get_db)):
-    """Создать новую диагностику"""
-    return crud.DiagnosticCRUD.create_diagnostic(db, diag.dict())
+@router.get("/top-risks")
+def get_top_risks(limit: int = 5):
+    db = SessionLocal()
+    try:
+        risks = crud.DiagnosticCRUD.get_top_risks(db, limit=limit)
+        return risks
+    finally:
+        db.close()

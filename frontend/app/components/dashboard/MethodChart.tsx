@@ -3,20 +3,26 @@
 import React from 'react';
 
 interface MethodChartProps {
-  data: Record<string, number>;
+  data: Array<{
+    method: string;
+    count: number;
+  }>;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FF6B6B'];
 
 const MethodChart = ({ data }: MethodChartProps) => {
-  const chartData = Object.entries(data)
-    .filter(([_, value]) => value > 0)
-    .map(([name, value], index) => ({
-      name,
-      value,
-      color: COLORS[index % COLORS.length],
-      percentage: (value / Object.values(data).reduce((a, b) => a + b, 0)) * 100
-    }));
+  // Если data undefined или не массив, используем пустой массив
+  const chartData = Array.isArray(data) 
+    ? data
+        .filter(item => item && item.count > 0)
+        .map((item, index) => ({
+          name: item.method || `Метод ${index + 1}`,
+          value: item.count || 0,
+          color: COLORS[index % COLORS.length],
+          percentage: (item.count / data.reduce((total, curr) => total + (curr?.count || 0), 0)) * 100
+        }))
+    : [];
 
   if (chartData.length === 0) {
     return (

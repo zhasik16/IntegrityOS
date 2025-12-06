@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BarChart3, AlertTriangle, CheckCircle, Wrench, Brain } from 'lucide-react';
+import { BarChart3, AlertTriangle, CheckCircle, Wrench, Brain, RefreshCw } from 'lucide-react';
 import StatsCards from './components/dashboard/StatsCards';
 import MethodChart from './components/dashboard/MethodChart';
 import RiskChart from './components/dashboard/RiskChart';
@@ -11,6 +11,7 @@ import { DashboardStats } from '@/lib/types';
 export default function Home() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [mlForm, setMlForm] = useState({
     quality_grade: 'удовлетворительно' as 'удовлетворительно' | 'допустимо' | 'требует_мер' | 'недопустимо',
     param1: 0,
@@ -21,175 +22,311 @@ export default function Home() {
   const [prediction, setPrediction] = useState<{ label: string; probability: number } | null>(null);
   const [predicting, setPredicting] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const data = await api.getDashboardStats();
-        setStats(data);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    setStats(null);
+    try {
+      console.log('Загрузка данных дашборда...');
+      const data = await api.getDashboardStats();
+      console.log('Данные получены:', data);
+      setStats(data);
+    } catch (error: any) {
+      console.error('Ошибка загрузки данных дашборда:', error);
+      setError(`Ошибка загрузки данных: ${error.message || 'Неизвестная ошибка'}`);
+      
+      // Заглушка для демонстрации, если API недоступен
+      const fallbackData: DashboardStats = {
+        total_objects: 5,
+        total_inspections: 15,
+        total_defects: 6,
+        defect_rate: 40,
+        methods_distribution: [
+          { method: 'VIK', count: 4 },
+          { method: 'MFL', count: 3 },
+          { method: 'UTWM', count: 2 },
+          { method: 'VIBRO', count: 3 },
+          { method: 'PVK', count: 3 }
+        ],
+        criticality_distribution: [
+          { label: 'normal', count: 6 },
+          { label: 'medium', count: 5 },
+          { label: 'high', count: 4 }
+        ],
+        monthly_data: [
+          { month: '2023-10', total_inspections: 8, defects_found: 3 },
+          { month: '2023-11', total_inspections: 7, defects_found: 3 }
+        ],
+        top_risks: [
+          { object_id: 1, object_name: 'Кран подвесной', risk_score: 85, last_defect: '2023-10-15' },
+          { object_id: 3, object_name: 'Участок трубопровода №1', risk_score: 72, last_defect: '2023-09-20' },
+          { object_id: 2, object_name: 'Турбокомпрессор ТВ-80-1', risk_score: 65, last_defect: '2023-08-05' },
+          { object_id: 4, object_name: 'Компрессорная станция №1', risk_score: 45, last_defect: '2023-07-12' },
+          { object_id: 5, object_name: 'Задвижка DN300', risk_score: 30, last_defect: '2023-06-18' }
+        ]
+      };
+      setStats(fallbackData);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadData();
+  useEffect(() => {
+    loadDashboardData();
   }, []);
 
   const handlePredict = async () => {
     setPredicting(true);
+    setError(null);
     try {
+      console.log('Отправка данных для классификации:', mlForm);
       const result = await api.predictCriticality(mlForm);
+      console.log('Результат классификации:', result);
       setPrediction(result);
-    } catch (error) {
-      console.error('Error predicting:', error);
+    } catch (error: any) {
+      console.error('Ошибка ML классификации:', error);
+      setError(`Ошибка ML: ${error.message || 'Неизвестная ошибка'}`);
+      
+      // Fallback на локальную логику если API недоступен
+      if (mlForm.quality_grade === 'недопустимо') {
+        setPrediction({ label: 'high', probability: 0.9 });
+      } else if (mlForm.quality_grade === 'требует_мер') {
+        setPrediction({ label: 'medium', probability: 0.7 });
+      } else {
+        setPrediction({ label: 'normal', probability: 0.8 });
+      }
     } finally {
       setPredicting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '256px' }}>
-        <div style={{ color: '#6b7280' }}>Загрузка данных...</div>
-      </div>
-    );
-  }
+  // Стили для прогресс-бара и других элементов
+  const styles = {
+    spinner: {
+      animation: 'spin 1s linear infinite'
+    },
+    card: {
+      backgroundColor: 'white',
+      borderRadius: '0.5rem',
+      border: '1px solid #e5e7eb',
+      padding: '1.5rem',
+      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+    },
+    cardTitle: {
+      fontSize: '1.125rem',
+      fontWeight: 600,
+      color: '#111827',
+      marginBottom: '1rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem'
+    }
+  };
 
-  if (!stats) {
+  // Добавляем стили для анимации спиннера
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  if (loading && !stats) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '256px' }}>
-        <div style={{ color: '#ef4444' }}>Ошибка загрузки данных</div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <BarChart3 className="text-blue-500" size={24} />
+          </div>
+        </div>
+        <h2 className="mt-4 text-xl font-semibold text-gray-700">Загрузка данных дашборда</h2>
+        <p className="mt-2 text-gray-500">Подключение к серверу...</p>
+        <div className="mt-4 text-sm text-gray-400">
+          <p>API: {process.env.NEXT_PUBLIC_API_URL || 'Не настроен'}</p>
+          <button 
+            onClick={loadDashboardData}
+            className="mt-2 text-blue-500 hover:text-blue-600"
+          >
+            Попробовать снова
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Заголовок */}
+    <div className="space-y-6 p-6">
+      {/* Заголовок с возможностью перезагрузки */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p style={{ color: '#6b7280' }}>Обзор состояния магистральных трубопроводов</p>
+          <h1 className="text-2xl font-bold text-gray-900">IntegrityOS Dashboard</h1>
+          <p className="text-gray-600 mt-1">Обзор состояния магистральных трубопроводов</p>
+          {error && (
+            <div className="mt-2 flex items-center gap-2 text-sm">
+              <AlertTriangle className="text-yellow-500" size={16} />
+              <span className="text-yellow-600">{error}</span>
+              <button 
+                onClick={loadDashboardData}
+                className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
+              >
+                <RefreshCw size={14} />
+                Обновить
+              </button>
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-2" style={{ color: '#2563eb' }}>
+        <div className="flex items-center space-x-2 text-blue-600">
           <BarChart3 size={24} />
           <span className="font-semibold">Real-time monitoring</span>
+          <button 
+            onClick={loadDashboardData}
+            className="ml-4 p-2 hover:bg-gray-100 rounded-full"
+            title="Обновить данные"
+          >
+            <RefreshCw size={18} className="text-gray-500" />
+          </button>
         </div>
       </div>
 
       {/* Карточки статистики */}
-      <StatsCards stats={stats} />
+      {stats && <StatsCards stats={stats} />}
 
       {/* Графики и ML форма */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '1.5rem' }}>
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Левая колонка с графиками */}
+        <div className="lg:col-span-2 space-y-6">
           {/* Графики */}
-          <div className="charts-grid">
-            <MethodChart data={stats.methods_distribution} />
-            <RiskChart data={stats.criticality_distribution} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>
+                <Wrench className="text-blue-500" size={20} />
+                Распределение по методам
+              </h2>
+              {stats && <MethodChart data={stats.methods_distribution} />}
+            </div>
+            
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>
+                <AlertTriangle className="text-orange-500" size={20} />
+                Распределение по рискам
+              </h2>
+              {stats && <RiskChart data={stats.criticality_distribution} />}
+            </div>
           </div>
 
           {/* Топ рисков */}
-          <div className="card">
-            <h2 className="card-title flex items-center">
-              <AlertTriangle style={{ marginRight: '0.5rem', color: '#ef4444' }} size={20} />
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>
+              <AlertTriangle className="text-red-500" size={20} />
               Топ-5 объектов с высоким риском
             </h2>
-            <div className="table-container">
-              <table className="table">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
                 <thead>
-                  <tr>
-                    <th>Объект</th>
-                    <th>Трубопровод</th>
-                    <th>Уровень риска</th>
-                    <th>Последний дефект</th>
-                    <th>Статус</th>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Объект
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Трубопровод
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Уровень риска
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Последний дефект
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Статус
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {stats.top_risks.map((risk, index) => (
-                    <tr key={risk.object_id}>
-                      <td>
-                        <div className="font-semibold">{risk.object_name}</div>
-                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>ID: {risk.object_id}</div>
-                      </td>
-                      <td>
-                        <span className="badge badge-blue">MT-0{index + 1}</span>
-                      </td>
-                      <td>
-                        <div className="flex items-center">
-                          <div className="progress-bar">
-                            <div 
-                              className={`progress-fill ${
-                                risk.risk_score > 80 ? 'progress-fill-high' :
-                                risk.risk_score > 60 ? 'progress-fill-medium' : 'progress-fill-low'
-                              }`}
-                              style={{ width: `${risk.risk_score}%` }}
-                            ></div>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {stats?.top_risks.map((risk, index) => {
+                    const riskColor = risk.risk_score > 80 ? 'red' : 
+                                     risk.risk_score > 60 ? 'orange' : 'green';
+                    const statusText = risk.risk_score > 80 ? 'Критический' : 
+                                      risk.risk_score > 60 ? 'Средний' : 'Нормальный';
+                    
+                    return (
+                      <tr key={risk.object_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-gray-900">{risk.object_name}</div>
+                          <div className="text-sm text-gray-500">ID: {risk.object_id}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            MT-0{index + 1}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center">
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 mr-3">
+                              <div 
+                                className={`h-2.5 rounded-full ${
+                                  riskColor === 'red' ? 'bg-red-500' : 
+                                  riskColor === 'orange' ? 'bg-orange-500' : 'bg-green-500'
+                                }`}
+                                style={{ width: `${Math.min(risk.risk_score, 100)}%` }}
+                              ></div>
+                            </div>
+                            <span className="font-semibold">{risk.risk_score}%</span>
                           </div>
-                          <span className="ml-2 font-semibold">{risk.risk_score}%</span>
-                        </div>
-                      </td>
-                      <td style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        {risk.last_defect}
-                      </td>
-                      <td>
-                        {risk.risk_score > 80 ? (
-                          <span className="flex items-center" style={{ color: '#ef4444' }}>
-                            <AlertTriangle size={16} style={{ marginRight: '0.25rem' }} />
-                            Критический
-                          </span>
-                        ) : risk.risk_score > 60 ? (
-                          <span className="flex items-center" style={{ color: '#f59e0b' }}>
-                            <AlertTriangle size={16} style={{ marginRight: '0.25rem' }} />
-                            Средний
-                          </span>
-                        ) : (
-                          <span className="flex items-center" style={{ color: '#10b981' }}>
-                            <CheckCircle size={16} style={{ marginRight: '0.25rem' }} />
-                            Нормальный
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {risk.last_defect}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className={`flex items-center ${
+                            riskColor === 'red' ? 'text-red-600' : 
+                            riskColor === 'orange' ? 'text-orange-600' : 'text-green-600'
+                          }`}>
+                            {riskColor === 'red' ? (
+                              <AlertTriangle className="mr-1" size={16} />
+                            ) : riskColor === 'orange' ? (
+                              <AlertTriangle className="mr-1" size={16} />
+                            ) : (
+                              <CheckCircle className="mr-1" size={16} />
+                            )}
+                            {statusText}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        {/* ML форма */}
-        <div>
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h3 className="card-title flex items-center">
-              <Brain style={{ marginRight: '0.5rem' }} size={20} />
-              ML Классификация
+        {/* Правая колонка с ML формой */}
+        <div className="space-y-6">
+          {/* ML форма */}
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>
+              <Brain className="text-purple-500" size={20} />
+              ML Классификация рисков
             </h3>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="space-y-4">
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: 500,
-                  marginBottom: '0.5rem',
-                  color: '#111827'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Оценка качества
                 </label>
                 <select
                   value={mlForm.quality_grade}
                   onChange={(e) => setMlForm({...mlForm, quality_grade: e.target.value as any})}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white'
-                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="удовлетворительно">Удовлетворительно</option>
                   <option value="допустимо">Допустимо</option>
@@ -199,13 +336,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: 500,
-                  marginBottom: '0.5rem',
-                  color: '#111827'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Параметр 1 (глубина, мм)
                 </label>
                 <input
@@ -215,25 +346,13 @@ export default function Home() {
                   max="100"
                   value={mlForm.param1}
                   onChange={(e) => setMlForm({...mlForm, param1: parseFloat(e.target.value) || 0})}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem'
-                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0.0"
                 />
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: 500,
-                  marginBottom: '0.5rem',
-                  color: '#111827'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Параметр 2 (длина, мм)
                 </label>
                 <input
@@ -243,25 +362,13 @@ export default function Home() {
                   max="500"
                   value={mlForm.param2}
                   onChange={(e) => setMlForm({...mlForm, param2: parseFloat(e.target.value) || 0})}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem'
-                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0.0"
                 />
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: 500,
-                  marginBottom: '0.5rem',
-                  color: '#111827'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Параметр 3 (ширина, мм)
                 </label>
                 <input
@@ -271,45 +378,22 @@ export default function Home() {
                   max="100"
                   value={mlForm.param3}
                   onChange={(e) => setMlForm({...mlForm, param3: parseFloat(e.target.value) || 0})}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem'
-                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0.0"
                 />
               </div>
 
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem',
-                backgroundColor: '#f9fafb',
-                borderRadius: '0.375rem',
-                border: '1px solid #e5e7eb'
-              }}>
+              <div className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <input
                   type="checkbox"
                   id="defect-found"
                   checked={mlForm.defect_found}
                   onChange={(e) => setMlForm({...mlForm, defect_found: e.target.checked})}
-                  style={{ 
-                    width: '1rem',
-                    height: '1rem',
-                    cursor: 'pointer'
-                  }}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <label 
                   htmlFor="defect-found"
-                  style={{ 
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#111827',
-                    cursor: 'pointer'
-                  }}
+                  className="ml-2 block text-sm font-medium text-gray-700 cursor-pointer"
                 >
                   Дефект обнаружен
                 </label>
@@ -318,39 +402,17 @@ export default function Home() {
               <button
                 onClick={handlePredict}
                 disabled={predicting}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  backgroundColor: predicting ? '#9ca3af' : '#8b5cf6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: predicting ? 'not-allowed' : 'pointer',
-                  transition: 'background-color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
+                className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
               >
                 {predicting ? (
                   <>
-                    <div style={{ 
-                      width: '16px', 
-                      height: '16px', 
-                      border: '2px solid rgba(255,255,255,0.3)',
-                      borderTopColor: 'white',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }}></div>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                     Анализ...
                   </>
                 ) : (
                   <>
-                    <Brain size={16} />
-                    Классифицировать
+                    <Brain className="mr-2" size={18} />
+                    Классифицировать риск
                   </>
                 )}
               </button>
@@ -359,79 +421,59 @@ export default function Home() {
 
           {/* Результат предсказания */}
           {prediction && (
-            <div className="card">
-              <h3 className="card-title">Результат анализа</h3>
-              <div style={{ 
-                padding: '1.5rem',
-                backgroundColor: prediction.label === 'high' ? '#fef2f2' : 
-                               prediction.label === 'medium' ? '#fffbeb' : '#f0fdf4',
-                border: '1px solid',
-                borderColor: prediction.label === 'high' ? '#fee2e2' : 
-                            prediction.label === 'medium' ? '#fef3c7' : '#d1fae5',
-                borderRadius: '0.5rem',
-                marginTop: '1rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={styles.card}>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результат анализа</h3>
+              <div className={`p-4 rounded-lg border ${
+                prediction.label === 'high' ? 'bg-red-50 border-red-100' : 
+                prediction.label === 'medium' ? 'bg-orange-50 border-orange-100' : 
+                'bg-green-50 border-green-100'
+              }`}>
+                <div className="flex items-center gap-3 mb-4">
                   {prediction.label === 'high' ? (
-                    <AlertTriangle size={24} style={{ color: '#ef4444' }} />
+                    <AlertTriangle className="text-red-500" size={28} />
                   ) : prediction.label === 'medium' ? (
-                    <AlertTriangle size={24} style={{ color: '#f59e0b' }} />
+                    <AlertTriangle className="text-orange-500" size={28} />
                   ) : (
-                    <CheckCircle size={24} style={{ color: '#10b981' }} />
+                    <CheckCircle className="text-green-500" size={28} />
                   )}
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '1.125rem' }}>
-                      {prediction.label === 'high' ? 'Высокий риск' :
-                       prediction.label === 'medium' ? 'Средний риск' : 'Нормальный'}
+                    <div className="font-bold text-lg">
+                      {prediction.label === 'high' ? 'ВЫСОКИЙ РИСК' :
+                       prediction.label === 'medium' ? 'СРЕДНИЙ РИСК' : 'НОРМАЛЬНЫЙ'}
                     </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    <div className="text-sm text-gray-600">
                       Вероятность: {(prediction.probability * 100).toFixed(1)}%
                     </div>
                   </div>
                 </div>
 
-                <div style={{ 
-                  width: '100%', 
-                  height: '8px', 
-                  backgroundColor: '#e5e7eb', 
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  marginBottom: '1rem'
-                }}>
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-4">
                   <div 
-                    style={{ 
-                      width: `${prediction.probability * 100}%`, 
-                      height: '100%',
-                      backgroundColor: prediction.label === 'high' ? '#ef4444' : 
-                                     prediction.label === 'medium' ? '#f59e0b' : '#10b981',
-                      borderRadius: '4px'
-                    }}
+                    className={`h-full ${
+                      prediction.label === 'high' ? 'bg-red-500' : 
+                      prediction.label === 'medium' ? 'bg-orange-500' : 'bg-green-500'
+                    }`}
+                    style={{ width: `${prediction.probability * 100}%` }}
                   />
                 </div>
 
-                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                <p className="text-sm text-gray-700 mb-4">
                   {prediction.label === 'high' 
-                    ? 'Требуется срочное вмешательство и внеплановый ремонт.'
+                    ? '⚠️ Требуется срочное вмешательство и внеплановый ремонт. Необходимо остановить эксплуатацию объекта.'
                     : prediction.label === 'medium'
-                    ? 'Рекомендуется плановый ремонт в ближайшее время.'
-                    : 'Объект в нормальном состоянии. Плановое обследование по графику.'}
-                </div>
+                    ? '⚠️ Рекомендуется плановый ремонт в ближайшее время. Требуется усиленный контроль.'
+                    : '✅ Объект в нормальном состоянии. Плановое обследование по графику.'}
+                </p>
 
-                <div style={{ 
-                  marginTop: '1rem',
-                  padding: '0.75rem',
-                  backgroundColor: 'rgba(255,255,255,0.5)',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.75rem',
-                  color: '#6b7280'
-                }}>
-                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Использованные параметры:</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div className="text-xs text-gray-500 bg-white/50 p-3 rounded">
+                  <div className="font-medium mb-1">Использованные параметры:</div>
+                  <div className="grid grid-cols-2 gap-1">
                     <div>Оценка: {mlForm.quality_grade}</div>
                     <div>Параметр 1: {mlForm.param1}мм</div>
                     <div>Параметр 2: {mlForm.param2}мм</div>
                     <div>Параметр 3: {mlForm.param3}мм</div>
                     <div>Дефект: {mlForm.defect_found ? 'Да' : 'Нет'}</div>
+                    <div>Время: {new Date().toLocaleTimeString()}</div>
                   </div>
                 </div>
               </div>

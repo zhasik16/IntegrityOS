@@ -1,19 +1,51 @@
+// frontend/app/components/dashboard/RiskChart.tsx
 'use client';
 
 import React from 'react';
 
 interface RiskChartProps {
-  data: Record<string, number>;
+  data: Array<{
+    label: string;
+    count: number;
+  }>;
 }
 
-const RiskChart = ({ data }: RiskChartProps) => {
-  const chartData = [
-    { name: 'Нормальный', value: data.normal || 0, color: '#10B981' },
-    { name: 'Средний', value: data.medium || 0, color: '#F59E0B' },
-    { name: 'Высокий', value: data.high || 0, color: '#EF4444' },
-  ];
+const RISK_COLORS: Record<string, string> = {
+  high: '#FF6B6B',
+  medium: '#FFBB28',
+  normal: '#00C49F'
+};
 
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+const RISK_LABELS: Record<string, string> = {
+  high: 'Высокий риск',
+  medium: 'Средний риск',
+  normal: 'Нормальный'
+};
+
+const RiskChart = ({ data }: RiskChartProps) => {
+  // Если data undefined или не массив, используем пустой массив
+  const chartData = Array.isArray(data) 
+    ? data
+        .filter(item => item && item.count > 0)
+        .map(item => ({
+          label: item.label,
+          name: RISK_LABELS[item.label] || item.label,
+          value: item.count || 0,
+          color: RISK_COLORS[item.label] || '#6b7280',
+          percentage: (item.count / data.reduce((total, curr) => total + (curr?.count || 0), 0)) * 100
+        }))
+    : [];
+
+  if (chartData.length === 0) {
+    return (
+      <div className="card">
+        <h3 className="card-title">Распределение по критичности</h3>
+        <div className="chart-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ color: '#6b7280' }}>Нет данных для отображения</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card">
@@ -22,12 +54,12 @@ const RiskChart = ({ data }: RiskChartProps) => {
         <div style={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '1rem',
+          gap: '0.5rem',
           height: '100%',
           justifyContent: 'center'
         }}>
           {chartData.map((item, index) => (
-            <div key={index}>
+            <div key={index} style={{ marginBottom: '0.75rem' }}>
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
@@ -43,45 +75,26 @@ const RiskChart = ({ data }: RiskChartProps) => {
                   <span style={{ fontWeight: 500 }}>{item.name}</span>
                 </div>
                 <span style={{ fontWeight: 600, color: item.color }}>
-                  {item.value} ({total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}%)
+                  {item.value} ({item.percentage.toFixed(1)}%)
                 </span>
               </div>
               <div style={{
                 width: '100%',
-                height: '12px',
+                height: '8px',
                 backgroundColor: '#e5e7eb',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: `${total > 0 ? (item.value / total) * 100 : 0}%`,
+                  width: `${item.percentage}%`,
                   height: '100%',
                   backgroundColor: item.color,
-                  borderRadius: '6px'
+                  borderRadius: '4px'
                 }}></div>
               </div>
             </div>
           ))}
         </div>
-      </div>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: '1rem',
-        marginTop: '1rem'
-      }}>
-        {chartData.map((item) => (
-          <div key={item.name} style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: 700, 
-              color: item.color 
-            }}>
-              {item.value}
-            </div>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{item.name}</div>
-          </div>
-        ))}
       </div>
     </div>
   );

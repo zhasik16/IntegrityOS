@@ -6,10 +6,11 @@ interface StatsCardsProps {
 }
 
 const StatsCards = ({ stats }: StatsCardsProps) => {
+  // Используем правильные поля из DashboardStats
   const cards = [
     {
       title: 'Всего объектов',
-      value: stats.total_objects.toString(),
+      value: stats?.total_objects?.toString() || '0',
       icon: <BarChart3 className="stat-icon-inner" />,
       cardClass: 'stat-card stat-card-blue',
       valueClass: 'stat-value stat-value-blue',
@@ -17,7 +18,7 @@ const StatsCards = ({ stats }: StatsCardsProps) => {
     },
     {
       title: 'Обследований',
-      value: stats.total_diagnostics.toString(),
+      value: stats?.total_inspections?.toString() || '0',
       icon: <CheckCircle className="stat-icon-inner" />,
       cardClass: 'stat-card stat-card-green',
       valueClass: 'stat-value stat-value-green',
@@ -25,15 +26,15 @@ const StatsCards = ({ stats }: StatsCardsProps) => {
     },
     {
       title: 'Дефектов',
-      value: stats.defects_count.toString(),
+      value: stats?.total_defects?.toString() || '0',
       icon: <AlertTriangle className="stat-icon-inner" />,
       cardClass: 'stat-card stat-card-red',
       valueClass: 'stat-value stat-value-red',
       iconClass: 'stat-icon stat-icon-red'
     },
     {
-      title: 'Требуют мер',
-      value: Math.floor(stats.defects_count * 0.4).toString(),
+      title: 'Процент дефектов',
+      value: `${stats?.defect_rate?.toFixed(1) || '0'}%`,
       icon: <Wrench className="stat-icon-inner" />,
       cardClass: 'stat-card stat-card-yellow',
       valueClass: 'stat-value stat-value-yellow',
